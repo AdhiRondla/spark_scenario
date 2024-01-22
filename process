@@ -1,0 +1,64 @@
+Scenario:
+=======
+I had to process around 400 GB of JSON data where I have the flexibility to extract the JSON data in multiple small files or a single BIG file.
+ 
+Challenges Faced:
+=============
+ 
+Scenario 1: 1 Large file
+---------------------------
+While reading single json using reader API it was taking 1+ hr to LOAD and then getting stuck for 2hr with no progress.
+Even basic show(10) or writer api commands were not working.
+ 
+Scenario 2: around 100 files each 3/4 GB
+----------------------------------------------
+Case 1:
+
+> On reading all 100 JSON files under the same directory, the scenario was same.
+> Load was taking around 1hr +, post while both write/ show were not working. 👾
+ 
+Case 2:
+
+> I have tried using for loop and load/ save files one by one, but it was again not time efficient, and resource was not being utilized properly as it was sequential.
+> This fixed the save/ show issue post loading JSON file using reader API. But it took ~3 hrs (approx 1.5min for each file) to load JSON and save it as Parquet format. ⌛
+ 
+(Decided to convert it to parquet format so that next transformations will be smooth and reloading file for lost partition will not take much time.)
+ 
+Case 3: (optimal approach)
+ 
+> Generated the files with pattern as [file0, file01, file02,.. file09, file1, file10, file11,… file19,….., file99]
+> Used a for loop with range(0,10) - and read with pattern "file(i)*". This loaded 11 files parallelly and took same 1.5min for each iteration. (total time ~15min {reduced from 3hr})
+
+
+By this approach I was able to process and transform the data in 25min in total (Including JSON load, multiple wide transformations, save the 2 different outputs to MySQL table and Hive Table.)
+ 
+--> To further optimize this, I have cached the cleaned intermediate Dataframe in memory. As I was performing multiple transformations on the same Dataframe again and again.
+
+Multiple Small Files:
+Parallel Processing: Smaller files allow for better parallel processing, especially if you are using distributed computing frameworks like Apache Spark or Hadoop. Each file can be processed independently, leading to better resource utilization.
+
+Fault Tolerance: If one small file fails during processing, it doesn't impact the entire dataset. This makes it easier to handle errors and recover from failures.
+
+Scalability: Adding more processing nodes can be more efficient with smaller files, as they can be distributed across nodes more evenly.
+
+Incremental Processing: If your data is continuously growing, it's easier to process new small files incrementally without reprocessing the entire dataset.
+
+Single Large File:
+Reduced Overhead: A single large file can reduce the overhead associated with managing and processing many small files. Filesystem overhead and metadata management can be more efficient.
+
+Compression: Large files may compress better, reducing storage and bandwidth requirements. This can be important if storage costs or network transfer speeds are a concern.
+
+Simplified Management: Managing a single file may simplify data organization and metadata tracking.
+
+Sequential Processing: Some processing tasks might benefit from sequential processing, especially if the operations involve a lot of inter-record dependencies.
+
+Recommendations:
+Data Characteristics: Consider the nature of your data. If it naturally partitions into smaller logical units, using smaller files might be beneficial.
+
+Processing Framework: Check if the processing framework you are using is optimized for handling large or small files. Some frameworks may have specific optimizations for one or the other.
+
+Resource Availability: Assess the resources (memory, processing power) available in your environment. If you have a distributed environment, smaller files may be more suitable for parallelization.
+
+Use Case: Understand your specific use case. For example, if your processing involves complex joins or aggregations, parallel processing might be more critical.
+
+Ultimately, it's often a good idea to experiment with both approaches and evaluate the performance based on your specific requirements and constraints.
